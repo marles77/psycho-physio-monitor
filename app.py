@@ -2,14 +2,9 @@
 # Main classes
 # ==========================================================
 
-import os
 import io
-import sys
-#import logging
 from logger import logger
 import time
-#import tkinter as tk
-from tkinter import filedialog, Menu, PhotoImage
 from tkinter.messagebox import showinfo
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -20,7 +15,6 @@ matplotlib.use('TkAgg')
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 #from matplotlib.backend_bases import MouseButton
-#import matplotlib.animation as animation
 from matplotlib.ticker import FuncFormatter
 #import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
@@ -60,8 +54,7 @@ class SerialReader:
                  port: str = Constants.PORTS[2], 
                  baudrate: int = Constants.BAUDRATES[4], 
                  sample_count: int = Constants.SAMPLE_COUNT_ECG,
-                 packet_size: int = Constants.SAMPLE_COUNT_ECG * Constants.NBYTES, 
-                 bytes=Constants.NBYTES, 
+                 packet_size: int = Constants.SAMPLE_COUNT_ECG * Constants.NBYTES,  
                  raw_queue=None,
                  proc_queue=None,
                  run_event=None,
@@ -92,7 +85,6 @@ class SerialReader:
             return res
         return False
             
-
 
     def stop(self) -> None:
         self._close_connection()
@@ -139,22 +131,21 @@ class SerialReader:
             try:
                 while self.run_event.is_set():
                         #print("Reading data...")
-                        #if self.ser.in_waiting:
                         if self.pause_event.is_set():
                             # paused — do not read
                             time.sleep(0.1)
                             continue
                         raw = self.ser.read(self.packet_size)
-                        #print(f"Raw data length: {len(raw)}")
+                        
                         if len(raw) == self.packet_size:
                             vals = struct.unpack('<' + 'H'*self.sample_count, raw)
                             pkt = np.array(vals, dtype=np.float32)/100 if self.mode in ('gsr', 'synth_gsr') else np.array(vals, dtype=np.uint16) 
-                            #print(f"Read packet: {pkt}")
+                            
                             if self.raw_queue:
                                 self.raw_queue.put(pkt)
                             if self.proc_queue:
                                 self.proc_queue.put(pkt)
-                            #print(f"Raw: {self.raw_queue.qsize()}, Proc queue size: {self.proc_queue.qsize()}")
+                            
                     
             except (serial.SerialException, KeyboardInterrupt, Exception) as e:
                 logger.info(f"Unexpected error: {e}")
@@ -170,7 +161,6 @@ class SerialReader:
         '''Clear all items in the queue.'''
         removed = clear_queue(queue, block=True)
         logger.info(f"Cleared {removed} items from the queue.")
-
 
 
 # ==========================================================
@@ -200,7 +190,7 @@ class App(ttk.Window):
         self.sample_count = 0
         self.sample_rate = 0
         self.buffer_duration = Constants.EPOCH_TIME  # seconds visible on raw plot
-        self.buffer = None # deque(maxlen=self.sample_rate * self.buffer_duration)
+        self.buffer = None
         self.filtered_data = np.array([], dtype=np.uint16)
         self.agg_measure1 = []
         self.agg_buffer = None
@@ -209,15 +199,11 @@ class App(ttk.Window):
         # configure window grid
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
-        #self.frame.pack(fill=BOTH, expand=YES)
 
         self.frame = ttk.Frame(master=self, padding=10)
+        #self.frame.grid_rowconfigure(0, minsize=50)
         self.frame.grid_rowconfigure(4, minsize=160)
         self.frame.grid_rowconfigure(5, minsize=160)
-
-        # self.frame.grid_columnconfigure(1, minsize=800)
-        # for i in range(1, 6):
-        #     self.frame.grid_columnconfigure(1, minsize=160)
         
         self.frame.grid(column=0, row=0, sticky=NSEW)
 
@@ -244,17 +230,17 @@ class App(ttk.Window):
                                           sample_count=0
                                           )
 
+        # First update of plots
         self.after(Constants.RAW_PLOT_RATE, self.update_raw_plot)
         self.after(Constants.FILT_PLOT_RATE, self.update_agg_plots)
         
 
-
     def _create_widgets(self, master) -> None:
         
         # --- 1st row ---
+
         self.label_head = ttk.Label(master=master, text=f"Welcome to {Constants.APP_TITLE}")
-        self.label_head.grid(column=0, row=0, sticky=W, padx=1, pady=1, columnspan=6)
-        #self.label.pack(pady=20)
+        self.label_head.grid(column=0, row=0, sticky=W, padx=1, pady=10, columnspan=6)
 
         # --- 2nd row buttons ---
 
@@ -267,7 +253,7 @@ class App(ttk.Window):
         self.button_ecg = ttk.Button(master=master, text="Restart ECG", bootstyle="info", command=self.on_button_ecg_click, width=Constants.BUTTON_WIDTH, state=DISABLED)
         self.button_ecg.grid(column=2, row=1, sticky=NSEW, padx=1, pady=1)
 
-        self.button_stop = ttk.Button(master=master, text="Stop", bootstyle="warning", command=self.on_button_stop_click, width=Constants.BUTTON_WIDTH)
+        self.button_stop = ttk.Button(master=master, text="Stop", bootstyle="warning", command=self.on_button_stop_click, width=Constants.BUTTON_WIDTH, state=DISABLED)
         self.button_stop.grid(column=3, row=1, sticky=NSEW, padx=1, pady=1)
 
         self.cbo_port = ttk.Combobox(master=master, text="Select COM Port", values=Constants.PORTS, exportselection=False, width=Constants.BUTTON_WIDTH)
@@ -294,7 +280,7 @@ class App(ttk.Window):
 
         self.input_group2 = ttk.Labelframe(master=master, text="Epoch time (sec)", padding=1)
         self.input_group2.grid(column=0, row=4, rowspan=2, sticky=W, padx=1, pady=1)
-        self.spinbox_time = ttk.Spinbox(master=self.input_group2, from_=0, to=10)
+        self.spinbox_time = ttk.Spinbox(master=self.input_group2, from_=5, to=30)
         self.spinbox_time.pack(fill=X, padx=2, pady=2)
         self.spinbox_time.set(Constants.EPOCH_TIME)
         # self.toggle_record = ttk.Checkbutton(master=master, text="Record", bootstyle=(DANGER, ROUND, TOGGLE))
@@ -314,7 +300,6 @@ class App(ttk.Window):
         self.trim3_low = 0
         self.trim3_up = 0
 
-
         # --- Raw plot (data from thread) ---
 
         self.fig1 = Figure(figsize=(12, 2), dpi=100, tight_layout=True)
@@ -322,7 +307,6 @@ class App(ttk.Window):
         self.ax1.tick_params(labelsize=8)
         self.ax1.set_xlabel("samples", fontsize=8)
         self.raw_line = self.ax1.plot([], [], lw=1, color = 'g')[0]
-        #self.ax1.set_title("Live Raw Data")
         self.ax1.set_autoscaley_on(False) 
         #self.ax1.set_ylim(self.spinbox_plot1_low.get(), self.spinbox_plot1_up.get())
         self.canvas1 = FigureCanvasTkAgg(self.fig1, master=master)
@@ -340,7 +324,7 @@ class App(ttk.Window):
         self.ax3.tick_params(labelsize=8)
         self.ax3.set_xlabel("epochs", fontsize=8)
         self.agg_line = self.ax3.plot([], [], color='orange', lw=1.5)[0]
-        self.ax3.grid(axis='y')
+        #self.ax3.grid(axis='y')
         self.canvas3 = FigureCanvasTkAgg(self.fig3, master=master)
         self.canvas3.get_tk_widget().grid(column=1, row=6, columnspan=5, rowspan=2, sticky=NSEW)
 
@@ -359,7 +343,7 @@ class App(ttk.Window):
         self.label_val2.grid(column=5, row=8, sticky=SW, padx=1, pady=5, columnspan=1)
         
 
-
+    # ============ TODO: consider if it is needed at all ============
     def _create_menu(self, master) -> None:
         menubar = ttk.Menu(master=master)
         #file_menu = ttk.Menu(master=menubar)
@@ -376,7 +360,7 @@ class App(ttk.Window):
             menu=menubar
         )
         mb.grid(column=3, row=1, sticky=NE, padx=1, pady=1)
-
+# ====================================================================
 
     def on_button_conn_click(self) -> None:
         if not self.serial_reader.ser or not self.serial_reader.ser.is_open:
@@ -392,6 +376,7 @@ class App(ttk.Window):
                 time.sleep(1)
                 self.button_ecg.config(state=NORMAL)
                 self.button_gsr.config(state=NORMAL)
+                self.button_stop.config(state=NORMAL)
 
             else:
                 showinfo("Error", f"Failed to open serial port {self.serial_reader.port}.")
@@ -401,6 +386,7 @@ class App(ttk.Window):
             if self.proc:
                 self.proc.join(timeout=1)
                 self.proc = None
+            
             self.serial_reader.stop()
             clear_queue(self.raw_queue, block=True)
             clear_queue(self.proc_in, block=True)
@@ -408,12 +394,14 @@ class App(ttk.Window):
             print("Disconnected from serial port.")
             self.button_ecg.config(state=DISABLED)
             self.button_gsr.config(state=DISABLED)
+            self.button_stop.config(state=DISABLED)
             self.button_conn.config(bootstyle="success", text="Connect")
             self.label_bottom1.config(text="Status: Disconnected")
             self.label_bottom2.config(text="Streaming not started")
             self.label_val1.config(text="N/A")
             self.label_val2.config(text="N/A")
 
+            # Clear plots
             self.raw_line.set_data([], [])
             self.canvas1.draw_idle()
             self.canvas1.flush_events()
@@ -421,8 +409,7 @@ class App(ttk.Window):
             self.label_fig2.config(text="No data", image="")
 
             self.agg_line.set_data([], [])
-            #self.ax3.texts.clear()
-            for txt in list(self.ax3.texts):        # list(...) to avoid mutation during iteration
+            for txt in list(self.ax3.texts):
                 try:
                     txt.remove()
                 except Exception:
@@ -431,27 +418,27 @@ class App(ttk.Window):
             self.canvas3.flush_events()
         
 
-    
-
     def on_button_gsr_click(self) -> None:
         #showinfo("Information", "Button GSR was clicked!")
         if self.conn:
-            mode = 'synth_gsr'
+            mode = Constants.MODES_USED[0]
+            epoch_time = int(self.spinbox_time.get())
+
             # Buttons etc.
             self.button_gsr.config(state=DISABLED)
             self.button_ecg.config(state=DISABLED)
+            self.button_stop.config(state=NORMAL)
             self.spinbox_plot1_up.set(self.spin_value.plot1_gsr_up)
             self.spinbox_plot1_low.set(self.spin_value.plot1_gsr_low)
             self.spinbox_plot3_up.set(self.spin_value.plot3_gsr_up) 
             self.spinbox_plot3_low.set(self.spin_value.plot3_gsr_low)
-            
             self.label_bottom2.config(text=f"Streaming {mode.upper()} at {Constants.PACK_RATE*Constants.SAMPLE_COUNT_GSR} Hz")
             
             # Prepare GSR buffers etc.
             self.multiplier = Constants.MULTIPLIER_GSR
             self.sample_count = Constants.SAMPLE_COUNT_GSR
             self.sample_rate = Constants.SAMPLE_COUNT_GSR * Constants.PACK_RATE
-            self.buffer = np.zeros((Constants.PACK_RATE * Constants.SAMPLE_COUNT_GSR * Constants.EPOCH_TIME)) #deque(maxlen=self.sample_rate * self.buffer_duration)
+            self.buffer = np.zeros((Constants.PACK_RATE * Constants.SAMPLE_COUNT_GSR * epoch_time))
             self.buffer_idx = 0
             self.agg_buffer = np.zeros(100)
             self.agg_buffer_idx = 1
@@ -492,7 +479,7 @@ class App(ttk.Window):
             self.serial_reader.thread.start()
             self.proc = mp.Process(target=processing_worker_analysis, 
                                    args=(self.proc_in, self.proc_out, self.stop_event), 
-                                   kwargs={'pack_rate': Constants.PACK_RATE, 'time_window': Constants.EPOCH_TIME, 'sample_count': Constants.SAMPLE_COUNT_GSR, 'mode': mode}, 
+                                   kwargs={'pack_rate': Constants.PACK_RATE, 'time_window': epoch_time, 'sample_count': Constants.SAMPLE_COUNT_GSR, 'mode': mode}, 
                                    daemon=True)
             self.proc.start()
 
@@ -501,19 +488,24 @@ class App(ttk.Window):
     def on_button_ecg_click(self) -> None:
         #showinfo("Information", "Button ECG was clicked!")
         if self.conn:
-            mode = 'synth_ecg'
+            mode = Constants.MODES_USED[1]
+            epoch_time = int(self.spinbox_time.get())
+
             # Buttons etc.
             self.button_ecg.config(state=DISABLED)
             self.button_gsr.config(state=DISABLED)
+            self.button_stop.config(state=NORMAL)
             self.spinbox_plot1_up.set(self.spin_value.plot1_ecg_up)
             self.spinbox_plot1_low.set(self.spin_value.plot1_ecg_low)
+            self.spinbox_plot3_up.set(self.spin_value.plot3_ecg_up) 
+            self.spinbox_plot3_low.set(self.spin_value.plot3_ecg_low)
             self.label_bottom2.config(text=f"Streaming {mode.upper()} at {Constants.PACK_RATE*Constants.SAMPLE_COUNT_ECG} Hz")
 
             # Prepare ECG buffers etc.
             self.multiplier = Constants.MULTIPLIER_HR
             self.sample_count = Constants.SAMPLE_COUNT_ECG
             self.sample_rate = Constants.SAMPLE_COUNT_ECG * Constants.PACK_RATE
-            self.buffer = np.zeros((Constants.PACK_RATE * Constants.SAMPLE_COUNT_ECG * Constants.EPOCH_TIME)) #deque(maxlen=self.sample_rate * self.buffer_duration)
+            self.buffer = np.zeros((Constants.PACK_RATE * Constants.SAMPLE_COUNT_ECG * epoch_time))
             self.buffer_idx = 0
             self.agg_buffer = np.zeros(100)
             self.agg_buffer_idx = 1
@@ -553,12 +545,11 @@ class App(ttk.Window):
             self.serial_reader.thread.start()
             self.proc = mp.Process(target=processing_worker_analysis, 
                                    args=(self.proc_in, self.proc_out, self.stop_event), 
-                                   kwargs={'pack_rate': Constants.PACK_RATE, 'time_window': Constants.EPOCH_TIME, 'sample_count': Constants.SAMPLE_COUNT_ECG, 'mode': mode}, 
+                                   kwargs={'pack_rate': Constants.PACK_RATE, 'time_window': epoch_time, 'sample_count': Constants.SAMPLE_COUNT_ECG, 'mode': mode}, 
                                    daemon=True)
             self.proc.start()
             
         
-
     def on_button_stop_click(self) -> None:
         print("Paused")
         self.run_event.clear()
@@ -566,22 +557,21 @@ class App(ttk.Window):
         self.stop_event.set()
         self.serial_reader.pause()
         #self.pause_event.set()
-        # clear_queue(self.raw_queue, block=True)
-        # clear_queue(self.proc_in, block=True)
-        # clear_queue(self.proc_out, block=True)
+        
         if self.serial_reader.thread.is_alive():
             self.serial_reader.thread.join(timeout=1)
         if self.proc:
             self.proc.join(timeout=1)
             self.proc = None
+        self.button_stop.config(state=DISABLED)
         print("Stopped cleanly.")
 
     
-    #TODO: not implemented yet
+    # ======= TODO: not implemented yet ======
     def resume(self):
         print("Resuming reader…")
         self.pause_event.clear()
-
+    # ========================================
 
 
     def on_close(self) -> None:
@@ -590,19 +580,21 @@ class App(ttk.Window):
         Safely kill the app
         '''
 
-        # update events
-        # self.close_event.set()
-        # self.stop_event.set()
-        # self.pause_event.clear()
-
-        # make sure that tkinter loop is stopped
-        # try:
-        #     self.after_cancel(self.after_id)
-        # except (AttributeError, Exception) as e:
-        #     print(f"Error: {e}. Quitting anyway.")
-
+        self.serial_reader.pause()
+        self.stop_event.set()
+        
+        if self.serial_reader.thread:
+            if self.serial_reader.thread.is_alive():
+                    self.serial_reader.thread.join(timeout=1)
+        if self.proc:
+            self.proc.join(timeout=1)
+            self.proc = None
+        
         self.serial_reader.stop()
         time.sleep(0.1)
+        clear_queue(self.raw_queue, block=True)
+        clear_queue(self.proc_in, block=True)
+        clear_queue(self.proc_out, block=True)
         self.quit()
         self.destroy()
         
@@ -612,32 +604,30 @@ class App(ttk.Window):
     # ======================================================
     # Plot update loops
     # ======================================================
-    #
+    
     def update_raw_plot(self):
-        """Continuously updates live waveform"""
+        """Continuously updates raw data plot"""
         new_data = False
-        #print(self.buffer)
         divider = Constants.DIVIDER_ECG if self.serial_reader.mode in ('ecg', 'synth_ecg') else Constants.DIVIDER_GSR
+        
         if (self.buffer is not None) and (self.run_event.is_set()):
             try:
                 while not self.raw_queue.empty():
                         pkt = self.raw_queue.get_nowait()
                         pkt_len = len(pkt)
                         if (pkt_len > 0) and (self.buffer_idx + pkt_len <= self.buffer.shape[0]):
-                            shape_to_report = self.buffer[self.buffer_idx : self.buffer_idx + pkt_len].shape
+                            #shape_to_report = self.buffer[self.buffer_idx : self.buffer_idx + pkt_len].shape
                             idx = self.buffer_idx
                             self.buffer[idx : idx + pkt_len] = pkt
                             self.buffer_idx += pkt_len
-                            #logger.info(f"Buffer idx: {self.buffer_idx}, Packet len: {pkt_len}, Packet data: {pkt}\n")
                             new_data = True
             except (ValueError, Exception) as e:
                 logger.info(f"Error in update_raw_plot: {e}")
-                logger.info(f"Buffer size: {self.buffer.shape}, Buffer index = {idx}, Broadcast shape: {shape_to_report}, Packet size: {pkt.shape}, Packet len: {pkt_len}")
+                #logger.info(f"Buffer size: {self.buffer.shape}, Buffer index = {idx}, Broadcast shape: {shape_to_report}, Packet size: {pkt.shape}, Packet len: {pkt_len}")
                 
-
             if new_data:
                 y = self.buffer[:self.buffer_idx]
-                y_norm = y / divider #self._normalize_to_display(y, 0.2, 0.8) #_normalize_to_range(y, 0, 1)
+                y_norm = y / divider
                 x = np.arange(y.shape[0])
                 #logger.info(f"x: {x}, y: {y_norm}")
                 self.raw_line.set_data(x, y_norm)
@@ -660,7 +650,6 @@ class App(ttk.Window):
         img_data = False
         if self.run_event.is_set():
             while not self.proc_out.empty():
-                #self.filtered_data = self.proc_out.get_nowait()
                 data = self.proc_out.get_nowait()
                 img_data = data[0]
                 measures = data[1]
@@ -668,32 +657,24 @@ class App(ttk.Window):
                 new_data = True
                 
             if new_data and img_data: 
-                #logger.info(f"{filtered}")
                 self.counter += 1
-                #self.label_val2.configure(text=f"{self.counter} Filtered Len: {len(self.filtered_data)}")
-                #logger.info(f"Filtered data shape: {self.filtered_data.shape}\nData: {self.filtered_data}")
-                
                 image = Image.open(io.BytesIO(img_data))
-                #resized = image.resize((400, 300), Image.LANCZOS)
                 self.photo = ImageTk.PhotoImage(image)
                 self.label_fig2.config(text="", image=self.photo)
-                #self.label_fig2.config(image=self.photo)
-
-                #self.agg_measure1.append(measures['bpm'].item())
                 self.agg_buffer[self.agg_buffer_idx] = measures['bpm']/self.multiplier if self.serial_reader.mode in ('ecg', 'synth_ecg') else measures['mean_gsr'][0]/self.multiplier
                 y = self.agg_buffer[:self.agg_buffer_idx+1]
                 x = np.arange(y.shape[0])
-                #print(f"x: {x}, y: {y}")
                 self.agg_line.set_data(x, y)
+
                 for xy in zip(x, y):                                       
-                    self.ax3.annotate('%d' % int(xy[1]*self.multiplier), xy=xy, textcoords='data', fontsize=6)
+                    self.ax3.annotate('%.1f' % float(xy[1]*self.multiplier), xy=xy, textcoords='data', fontsize=6)
                 self.ax3.set_ylim(self.trim3_low, 1 - self.trim3_up)
                 self.ax3.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: f'{y*self.multiplier:.0f}'))
                 
                 self.canvas3.draw_idle()
                 self.canvas3.flush_events()
-                #self.ax3.autoscale()
                 self.agg_buffer_idx += 1
+
                 if self.serial_reader.mode in ('ecg', 'synth_ecg'):
                     self.label_val2.configure(text=f"HR: {measures['bpm']:.1f}, RMSSD: {measures['rmssd']:.1f}")
                 else:
@@ -702,36 +683,4 @@ class App(ttk.Window):
 
         self.after(Constants.FILT_PLOT_RATE, self.update_agg_plots)
 
-#========================================================================================#
 
-    # def _multiply_by_number(self, y, pos):
-    #     return f'{y*1000:.0f}'  # integer formatting
-
-    # # ====================not used==================================
-    # def _normalize_to_range(self, y, lo=0.2, hi=0.5):
-    #     #y = np.astype(float)
-    #     ymin = y.min()
-    #     ymax = y.max()
-    #     #print(f"ymin: {ymin}, ymax: {ymax}")
-    #     if ymax == ymin:
-    #         # constant array — map to mid-range
-    #         return np.full_like(y, (lo + hi) / 2.0)
-    #     return lo + (y - ymin) * (hi - lo) / (ymax - ymin)
-    
-    
-    # # ====================not used==================================
-    # def _normalize_to_display(self, y, display_min, display_max):
-    #     # Compute normalized 0–1 range for raw data plotting
-    #     y_min = y.min()
-    #     y_max = y.max()
-    #     y_norm = (y - y_min) / (y_max - y_min + 1e-12)
-
-    #     # Map it into display range, BUT rescale proportionally if data range < display range
-    #     scale_ratio = (y_max - y_min) / (display_max - display_min)
-
-    #     # Center the waveform within the display range
-    #     y_center = (display_max + display_min) / 2
-    #     y_scaled = y_center + (y_norm - 0.5) * (y_max - y_min) / scale_ratio
-
-    #     # Clamp to display limits just in case
-    #     return np.clip(y_scaled, display_min, display_max)

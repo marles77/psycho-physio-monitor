@@ -34,4 +34,5 @@ class Constants:
                       'ecg': 'b',
                       'synth_ecg': 'c',
                       'synth_gsr': 'd'}
+    MODES_USED = ('synth_gsr', 'synth_ecg') # 1. GSR, 2. ECG; for real data: ('gsr', 'ecg')
     

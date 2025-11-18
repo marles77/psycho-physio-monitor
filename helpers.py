@@ -17,9 +17,8 @@ from threading import Event
 import heartpy as hp
 from pyEDA.main import process_statistical
 
-# ==========================================================
+
 # Processing worker (process)
-# ==========================================================
 
 def processing_worker_analysis(in_q: Queue, out_q: Queue, stop_event: Event, pack_rate: int, time_window: int, sample_count: int, mode: str) -> None:
     """Process data"""
@@ -30,15 +29,12 @@ def processing_worker_analysis(in_q: Queue, out_q: Queue, stop_event: Event, pac
     #idx = 0
     try:
         while not stop_event.is_set():
-            # Wait until at least 100 packets are available
-            #print(f"Proc size: {in_q.qsize()}")
+            # Wait until all packets are available
             if in_q.qsize() < batch_size:
-                # small sleep to avoid busy waiting
                 #time.sleep(0.05)
                 continue
-            print(f"Q size {in_q.qsize()}")
 
-            # Retrieve exactly 100 packets
+            # Retrieve exactly batch-size packets
             packets = []
             for _ in range(batch_size):
                 try:
@@ -49,7 +45,6 @@ def processing_worker_analysis(in_q: Queue, out_q: Queue, stop_event: Event, pac
 
             # Check if we got the full batch
             if len(packets) < batch_size:
-                # not enough data (another thread took some?)
                 print(f"Not enough packets retrieved: {len(packets)} < {batch_size}")
                 #continue
 
@@ -57,12 +52,12 @@ def processing_worker_analysis(in_q: Queue, out_q: Queue, stop_event: Event, pac
             buffer[:] = np.vstack(packets)
 
             # --- Processing step ---
-            #print(f"Processing {len(packets)} packets...")
+            
             filtered = buffer.flatten()
-            #logger.info(f"{filtered}")
+            
             if mode in ('ecg', 'synth_ecg'):
                 # Apply bandpass filter for ECG
-                cutoff_low = Constants.FILT_CUTOFF_LOW  # Low cutoff frequency
+                cutoff_low = Constants.FILT_CUTOFF_LOW
                 filtered_ecg = butter_lowpass_filter(filtered, cutoff_low, fs)
                 filtered_ecg = hp.remove_baseline_wander(filtered_ecg, fs)
                 working_data, measures = hp.process(filtered_ecg, fs)
@@ -92,10 +87,9 @@ def processing_worker_analysis(in_q: Queue, out_q: Queue, stop_event: Event, pac
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1)
                 buf.seek(0)
-                # print(f"Buffer size: {buf.getbuffer().nbytes} bytes")
                 
             if buf and measures:
-                out_q.put([buf.getvalue(), measures])#, filtered])
+                out_q.put([buf.getvalue(), measures]) #, filtered])
             else:
                 print("Worker: brak danych")
 
@@ -110,7 +104,7 @@ def processing_worker_analysis(in_q: Queue, out_q: Queue, stop_event: Event, pac
 
 # Signal filters
 
-def butter_lowpass_filter(data, cutoff, fs, order=4) -> np.ndarray:
+def butter_lowpass_filter(data: np.ndarray, cutoff: int, fs: float, order=4) -> np.ndarray:
     '''Lowpass Butterworth filter'''
 
     nyq = 0.5 * fs
@@ -142,7 +136,7 @@ def suppress_print():
         sys.stdout = original_stdout
 
 
-def clear_queue(q, block=False, settle_time=0.1) -> int:
+def clear_queue(q: Queue, block=False, settle_time: float=0.1) -> int:
     """
     Empties all items from a queue (threading or multiprocessing).
 

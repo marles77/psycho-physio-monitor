@@ -1,4 +1,5 @@
 contourpy==1.3.3
+cvxopt==1.3.2
 cycler==0.12.1
 fonttools==4.60.1
 heartpy==1.2.7
