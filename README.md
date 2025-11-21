@@ -1,5 +1,9 @@
 # PsychoPhysio monitor
 
+## Author
+Marcin Leśniak, PhD
+
+## Aim
 This Python/Tkinter app uses Arduino and connected GSR/ECG sensors to monitor physiological activity.
 
 ## Python setup
@@ -27,6 +31,9 @@ GSR sensor used in this project: https://wiki.seeedstudio.com/Grove-GSR_Sensor/
 |NC|White|
 |A0|Yellow|
 |||
+
+#### Calibration
+Try to adjust the resistor on the GSR board until the serial output shows ~200.
 
 ### ECG
 ECG sensor used in this project: https://wiki.dfrobot.com/Heart_Rate_Monitor_Sensor_SKU__SEN0213
